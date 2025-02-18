@@ -2,8 +2,14 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, current_user
 from app.models.user import User
 from app.extensions import db
+import re
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+def is_valid_email(email):
+    # Basic email validation
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -12,17 +18,25 @@ def register():
     
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form['email']
         password = request.form['password']
         
-        # Check if user already exists
-        user = User.query.filter_by(username=username).first()
-        if user:
+        # Validate email format
+        if not is_valid_email(email):
+            flash('Invalid email address')
+            return redirect(url_for('auth.register'))
+
+        # Check if username or email already exists
+        if User.query.filter_by(username=username).first():
             flash('Username already exists')
             return redirect(url_for('auth.register'))
         
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered')
+            return redirect(url_for('auth.register'))
+        
         try:
-            # Create new user with initial password
-            new_user = User(username=username, password='')
+            new_user = User(username=username, email=email)
             new_user.set_password(password)
             
             db.session.add(new_user)
@@ -30,7 +44,7 @@ def register():
             flash('Registration successful! Please login.')
             return redirect(url_for('auth.login'))
         except Exception as e:
-            print(f"Registration error: {str(e)}")  # Add debug print
+            print(f"Registration error: {str(e)}")
             db.session.rollback()
             flash('An error occurred. Please try again.')
             return redirect(url_for('auth.register'))
