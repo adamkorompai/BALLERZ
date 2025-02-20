@@ -47,4 +47,7 @@ instance/
 .webassets-cache
 
 # Logs
-*.log 
+*.log
+
+*.pyc
+.DS_Store 

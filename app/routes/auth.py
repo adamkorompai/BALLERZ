@@ -54,7 +54,7 @@ def register():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('main.welcome'))
+        return redirect(url_for('main.courts'))
     
     if request.method == 'POST':
         username = request.form['username']
@@ -64,7 +64,7 @@ def login():
         if user and user.verify_password(password):
             login_user(user)
             flash('Logged in successfully.')
-            return redirect(url_for('main.welcome'))
+            return redirect(url_for('main.courts'))
         flash('Invalid username or password')
     
     return render_template('auth/login.html')

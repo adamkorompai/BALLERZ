@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Google Maps Test</title>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Google Maps Test</h1>
+    
+    <!-- Debug information -->
+    <div style="margin: 20px; padding: 20px; background: #f0f0f0;">
+        <p>API Key Status: {{ 'Present' if api_key else 'Missing' }}</p>
+    </div>
+
+    <div id="map"></div>
+
+    {% if api_key %}
+        <script async defer
+            src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&callback=initMap">
+        </script>
+        <script>
+            function initMap() {
+                const map = new google.maps.Map(document.getElementById("map"), {
+                    zoom: 13,
+                    center: { lat: 48.8566, lng: 2.3522 },
+                });
+            }
+        </script>
+    {% else %}
+        <p>Cannot load map: API key is missing</p>
+    {% endif %}
+</body>
+</html> 

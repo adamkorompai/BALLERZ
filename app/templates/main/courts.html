@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Basketball Courts{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Nearby Basketball Courts</h1>
+        <p class="text-gray-600">Find basketball courts in your area</p>
+    </div>
+
+    <!-- Location permission request -->
+    <div id="locationRequest" class="mb-6 p-4 bg-yellow-100 rounded-lg">
+        <p>Please allow location access to find courts near you.</p>
+        <button id="shareLocationBtn" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            Share Location
+        </button>
+    </div>
+
+    <!-- Loading indicator -->
+    <div id="loading" class="hidden">
+        <p class="text-gray-600">Loading nearby courts...</p>
+    </div>
+
+    <!-- Error message -->
+    <div id="error" class="hidden mb-6 p-4 bg-red-100 rounded-lg">
+        <p class="text-red-700"></p>
+    </div>
+
+    <!-- Map -->
+    <div id="map" class="w-full h-96 rounded-lg shadow-lg mb-6"></div>
+
+    <!-- Courts list -->
+    <div id="courtsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Courts will be dynamically added here -->
+    </div>
+</div>
+
+<!-- Put the scripts here, before the Google Maps API loads -->
+<script>
+// Global variables
+let map;
+let markers = [];
+
+function requestLocation() {
+    console.log('Requesting location...');
+    if (navigator.geolocation) {
+        document.getElementById('locationRequest').classList.add('hidden');
+        document.getElementById('loading').classList.remove('hidden');
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('Location received:', position);
+                initMap(position);
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                document.getElementById('loading').classList.add('hidden');
+                showError('Unable to get your location. Please enable location services.');
+            }
+        );
+    } else {
+        showError('Geolocation is not supported by your browser');
+    }
+}
+
+function initMap(position) {
+    console.log('Initializing map with position:', position);
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+    const currentLocation = { lat, lng };
+
+    // Initialize map
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: currentLocation,
+        zoom: 13,
+    });
+
+    // Add marker for current location
+    new google.maps.Marker({
+        position: currentLocation,
+        map: map,
+        title: "Your Location",
+        icon: {
+            url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+        }
+    });
+
+    // Fetch nearby courts
+    fetchNearbyCourts(lat, lng);
+}
+
+function fetchNearbyCourts(lat, lng) {
+    console.log('Fetching nearby courts for:', lat, lng);
+    document.getElementById('loading').classList.remove('hidden');
+    
+    fetch(`/api/courts?lat=${lat}&lng=${lng}`)
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json().then(data => ({
+                status: response.status,
+                data: data
+            }));
+        })
+        .then(({status, data}) => {
+            console.log('Received data:', data);
+            document.getElementById('loading').classList.add('hidden');
+            
+            if (status !== 200) {
+                throw new Error(data.error || 'Failed to fetch courts');
+            }
+            
+            if (data.status === 'ZERO_RESULTS') {
+                showError('No basketball courts found in your area. Try increasing the search radius.');
+                return;
+            }
+            
+            if (!data.results || data.results.length === 0) {
+                showError('No results found');
+                return;
+            }
+
+            displayCourts(data.results);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('loading').classList.add('hidden');
+            showError(error.message);
+        });
+}
+
+function displayCourts(courts) {
+    console.log('Displaying courts:', courts);
+    const courtsList = document.getElementById('courtsList');
+    courtsList.innerHTML = '';
+
+    // Clear existing markers
+    markers.forEach(marker => marker.setMap(null));
+    markers = [];
+
+    courts.forEach(court => {
+        // Add marker to map
+        const marker = new google.maps.Marker({
+            position: {
+                lat: court.geometry.location.lat,
+                lng: court.geometry.location.lng
+            },
+            map: map,
+            title: court.name
+        });
+        markers.push(marker);
+
+        // Add court to list
+        const courtElement = document.createElement('div');
+        courtElement.className = 'bg-white rounded-lg shadow p-4';
+        courtElement.innerHTML = `
+            <h3 class="font-bold text-lg mb-2">${court.name}</h3>
+            <p class="text-gray-600 mb-2">${court.vicinity}</p>
+            <p class="text-gray-600">Rating: ${court.rating || 'N/A'} ⭐</p>
+            <a href="https://www.google.com/maps/place/?q=place_id:${court.place_id}" 
+               target="_blank"
+               class="mt-2 inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                View on Google Maps
+            </a>
+        `;
+        courtsList.appendChild(courtElement);
+    });
+}
+
+function showError(message) {
+    console.error('Error:', message);
+    const errorDiv = document.getElementById('error');
+    errorDiv.querySelector('p').textContent = message;
+    errorDiv.classList.remove('hidden');
+}
+
+// Initialize map when Google Maps API is loaded
+function initializeMap() {
+    console.log('Google Maps API loaded');
+    // Add click event listener to the button
+    document.getElementById('shareLocationBtn').addEventListener('click', requestLocation);
+    // Show location request if geolocation is available
+    if (navigator.geolocation) {
+        document.getElementById('locationRequest').classList.remove('hidden');
+    } else {
+        showError('Geolocation is not supported by your browser');
+    }
+}
+</script>
+
+{% if api_key %}
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places&callback=initializeMap">
+</script>
+{% endif %}
+{% endblock %}
